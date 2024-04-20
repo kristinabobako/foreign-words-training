@@ -93,21 +93,23 @@ const words = [
 
 let fiveWords = [];
 
-const dataModeTraining = {};
-const dataModeTest = {};
-const wordStatistics = [];
+const testModeData = {};
+const examModeData = {};
+const examStatistics = [];
 
-const currentWord = document.querySelector('#current-word');
-const studyMode = document.querySelector('#study-mode');
+const resultTestMode = JSON.parse(localStorage.getItem('testModeData'));
+const resultExamMode = JSON.parse(localStorage.getItem('examModeData'));
+
+const testMode = document.querySelector('#study-mode');
+const numberCurrentWord = document.querySelector('#current-word');
 const wordsProgress = document.querySelector('#words-progress');
 const shuffleWords = document.querySelector('#shuffle-words');
 const examMode = document.querySelector('#exam-mode');
 const correctPercent = document.querySelector('#correct-percent');
 const examProgress = document.querySelector('#exam-progress');
-const time = document.querySelector('#time');
-const examCards = document.querySelector('#exam-cards');
-const studyCards = document.querySelector('.study-cards');
-const slider = document.querySelector('.slider');
+const examTimer = document.querySelector('#time');
+const boxTestCards = document.querySelector('.study-cards');
+const sliderTestCard = document.querySelector('.slider');
 const flipCard = document.querySelector('.flip-card');
 const cardFront = document.querySelector('#card-front');
 const cardFrontWord = cardFront.querySelector('h1');
@@ -115,40 +117,51 @@ const cardBack = document.querySelector('#card-back');
 const cardBackWord = cardBack.querySelector('h1');
 const cardBackExample = cardBack.querySelector('span');
 const sliderControls = document.querySelector('.slider-controls');
+const examCards = document.querySelector('#exam-cards');
 const resultsModal = document.querySelector('.results-modal');
-const resultsContent = document.querySelector('.results-content');
-const timer = document.querySelector('#timer');
-const wordStats = document.querySelector('#word-stats');
+const boxResultsContent = document.querySelector('.results-content');
+const resultExamTime = document.querySelector('#timer');
+const templateWordStats = document.querySelector('#word-stats');
 
-let mode = 'training';
-let currentWords = 0;
+let studyMode = 'testing';
+let wordCounter = 0;
 
 function getRandomInt(max) {
     return Math.floor(Math.random() * max);
 };
 
 function createArray() {
-    while (fiveWords.length <= 4) {
-        const randomWord = words[getRandomInt(words.length)];
-        if (!fiveWords.includes(randomWord)) {
-            fiveWords.push(randomWord);
+    if (resultTestMode) {
+        fiveWords = resultTestMode.orderOfCards;
+        numberCurrentWord.textContent = resultTestMode.numberWord;
+        wordsProgress.value = resultTestMode.progressWord;
+        wordCounter = resultTestMode.counter;
+        back.disabled = testModeData.btnBack;
+        next.disabled = testModeData.btnNext;
+        defineAttribute();
+    } else {
+        while (fiveWords.length <= 4) {
+            const randomWord = words[getRandomInt(words.length)];
+            if (!fiveWords.includes(randomWord)) {
+                fiveWords.push(randomWord);
+            };
         };
+        wordsProgress.value += 20;
     };
     insertWord();
-    setDataModeTraining();
-    wordsProgress.value += 20;
+    setTestModeData();
     return fiveWords;
 };
 
 const arrayFiveWords = createArray();
 
 function insertWord() {
-    cardFrontWord.textContent = fiveWords[currentWords].wordEng;
-    cardBackWord.textContent = fiveWords[currentWords].wordRus;
-    cardBackExample.textContent = fiveWords[currentWords].usageExample;
+    cardFrontWord.textContent = fiveWords[wordCounter].wordEng;
+    cardBackWord.textContent = fiveWords[wordCounter].wordRus;
+    cardBackExample.textContent = fiveWords[wordCounter].usageExample;
 };
 
-slider.addEventListener('click', (event) => {
+sliderTestCard.addEventListener('click', (event) => {
     const element = event.target.closest('.slider');
 
     if (element) {
@@ -162,29 +175,30 @@ slider.addEventListener('click', (event) => {
 function shuffle() {
     fiveWords.sort(() => Math.random() - 0.5);
     insertWord();
-    setDataModeTraining();
+    setTestModeData();
 };
 
 shuffleWords.addEventListener('click', shuffle);
 
 function defineAttribute() {
-    if (currentWords <= 0) {
+    if (wordCounter <= 0) {
         back.disabled = true;
         next.disabled = false;
-    } else if (currentWords >= 4) {
+    } else if (wordCounter >= 4) {
         next.disabled = true;
-    } else if (currentWords >= 1) {
+    } else if (wordCounter >= 1) {
         back.disabled = false;
     };
-    setDataModeTraining();
+
+    setTestModeData();
 };
 
 function determineMode() {
-    if (mode === 'checkOfKnowledge') {
-        studyMode.classList.add('hidden');
-        studyCards.classList.add('hidden');
+    if (studyMode === 'examination') {
+        testMode.classList.add('hidden');
+        boxTestCards.classList.add('hidden');
         examMode.classList.remove('hidden');
-    } else if (mode === 'statistics') {
+    } else if (studyMode === 'statistics') {
         resultsModal.classList.remove('hidden');
     };
 };
@@ -195,6 +209,7 @@ function insertCards() {
     fiveWords.forEach((item) => {
         const card = document.createElement('div');
         card.classList.add('card');
+        card.classList.add('drac');
         card.id = item.wordEng;
         card.textContent = item.wordEng;
         fragment.append(card);
@@ -203,6 +218,7 @@ function insertCards() {
     fiveWords.forEach((item) => {
         const card = document.createElement('div');
         card.classList.add('card');
+        card.classList.add('drac');
         card.id = item.wordEng;
         card.textContent = item.wordRus;
         fragment.append(card);
@@ -217,34 +233,36 @@ sliderControls.addEventListener('click', (event) => {
     const button = event.target.id;
 
     if (button === 'back') {
-        currentWords--;
-        currentWord.textContent--;
+        wordCounter--;
+        numberCurrentWord.textContent--;
         insertWord();
         defineAttribute();
         wordsProgress.value -= 20;
+        setTestModeData();
     };
 
     if (button === 'exam') {
-        mode = 'checkOfKnowledge';
+        studyMode = 'examination';
         determineMode();
         insertCards();
         startTimer();
     };
 
     if (button === 'next') {
-        currentWords++;
-        currentWord.textContent++;
+        wordCounter++;
+        numberCurrentWord.textContent++;
         insertWord();
         defineAttribute();
         wordsProgress.value += 20;
+        setTestModeData();
     };
 });
 
 let timerId = 0;
 
 function startTimer() {
-    let minutes = +time.textContent.slice(0, 2);
-    let seconds = +time.textContent.slice(3, 5);
+    let minutes = +examTimer.textContent.slice(0, 2);
+    let seconds = +examTimer.textContent.slice(3, 5);
 
     timerId = setInterval(() => {
         seconds++;
@@ -253,7 +271,7 @@ function startTimer() {
             seconds = 0;
         };
 
-        time.textContent = `${format(minutes)}:${format(seconds)}`;
+        examTimer.textContent = `${format(minutes)}:${format(seconds)}`;
     }, 1000);
 };
 
@@ -268,59 +286,62 @@ function stopTimer() {
     clearInterval(timerId);
 };
 
-let currentClick = 0;
-let currentAttempts = 0;
+let clickCounter = 0;
+let attemptCounter = 0;
 
-let card1 = '';
-let cardId1 = '';
-let card2 = '';
-let cardId2 = '';
+let firstCard = '';
+let firstCardId = '';
+let secondCard = '';
+let secondCardId = '';
 
 let totalPercent = 0;
 
 function testKnowledge(event) {
-    currentClick++;
+    clickCounter++;
 
-    const wordAttempts = wordStats.content.cloneNode(true);
-
+    const wordStats = templateWordStats.content.cloneNode(true);
     let card = event.target;
     let cardId = event.target.id;
 
-    if (card.classList.contains('card')) {
-        if (currentClick === 1) {
-            card1 = card;
-            cardId1 = cardId;
-            card1.classList.add('correct');
-        } else if (currentClick === 2) {
-            card2 = card;
-            cardId2 = cardId;
-            currentAttempts++;
-            if (cardId1 === cardId2) {
-                card2.classList.add('correct');
-                card2.classList.add('fade-out');
-                card1.classList.add('fade-out');
-                currentClick = 0;
+    if (card.classList.contains('drac')) {
+        if (clickCounter === 1) {
+            firstCard = card;
+            firstCardId = cardId;
+            firstCard.classList.add('correct');
+            firstCard.classList.remove('drac');
+        } else if (clickCounter === 2) {
+            secondCard = card;
+            secondCardId = cardId;
+            attemptCounter++;
+            if (firstCardId === secondCardId) {
+                secondCard.classList.add('correct');
+                secondCard.classList.add('fade-out');
+                secondCard.classList.remove('drac');
+                firstCard.classList.add('fade-out');
+                clickCounter = 0;
                 totalPercent += 20;
                 correctPercent.textContent = `${totalPercent}%`;
                 examProgress.value += 20;
-                wordAttempts.querySelector('.word').querySelector('span').textContent = cardId1;
-                wordAttempts.querySelector('.attempts').querySelector('span').textContent = currentAttempts;
-                setDataModeTest();
-                resultsContent.append(wordAttempts);
-                currentAttempts = 0;
+                wordStats.querySelector('.word').querySelector('span').textContent = firstCardId;
+                wordStats.querySelector('.attempts').querySelector('span').textContent = attemptCounter;
+                setExamModeData();
+                boxResultsContent.append(wordStats);
+                attemptCounter = 0;
             } else {
-                currentClick = 1;
-                card2.classList.add('wrong');
+                clickCounter = 0;
+                secondCard.classList.add('wrong');
                 setTimeout(() => {
-                    card2.classList.remove('wrong');
+                    secondCard.classList.remove('wrong');
+                    firstCard.classList.remove('correct');
                 }, 500);
+                firstCard.classList.add('drac');
             };
         };
     } else {
-        if (currentClick === 1) {
-            currentClick = 0;
-        } else if (currentClick === 2) {
-            currentClick = 1;
+        if (clickCounter === 1) {
+            clickCounter = 0;
+        } else if (clickCounter === 2) {
+            clickCounter = 1;
         };
     };
 
@@ -329,9 +350,9 @@ function testKnowledge(event) {
             stopTimer();
         }, 0);
         examCards.innerHTML = '';
-        mode = 'statistics';
+        studyMode = 'statistics';
         determineMode();
-        timer.textContent = time.textContent;
+        resultExamTime.textContent = examTimer.textContent;
     };
 };
 
@@ -339,20 +360,23 @@ examCards.addEventListener('click', (event) => {
     testKnowledge(event);
 });
 
-function setDataModeTraining() {
-    dataModeTraining.currentWordEng = cardFront.textContent;
-    dataModeTraining.currentWordRus = cardBackWord.textContent;
-    dataModeTraining.usageExample = cardBackExample.textContent;
-    dataModeTraining.orderOfCards = fiveWords;
-    localStorage.setItem('dataModeTraining', JSON.stringify(dataModeTraining));
+function setTestModeData() {
+    testModeData.numberWord = numberCurrentWord.textContent;
+    testModeData.progressWord = wordsProgress.value;
+    testModeData.counter = wordCounter;
+    testModeData.btnBack = back.disabled;
+    testModeData.btnNext = next.disabled;
+    testModeData.orderOfCards = fiveWords;
+    localStorage.setItem('testModeData', JSON.stringify(testModeData));
 };
 
-function setDataModeTest() {
-    dataModeTest.timeTest = time.textContent;
+function setExamModeData() {
+    examMode.percent = totalPercent;
+    examModeData.timeTest = examTimer.textContent;
     const stats = {};
-    stats.word = cardId1;
-    stats.attempts = currentAttempts;
-    wordStatistics.push(stats);
-    dataModeTest.statistics = wordStatistics;
-    localStorage.setItem('dataModeTest', JSON.stringify(dataModeTest));
+    stats.word = firstCardId;
+    stats.attempts = attemptCounter;
+    examStatistics.push(stats);
+    examModeData.statistics = examStatistics;
+    localStorage.setItem('examModeData', JSON.stringify(examModeData));
 };
