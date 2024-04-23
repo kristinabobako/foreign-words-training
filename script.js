@@ -100,6 +100,10 @@ const examStatistics = [];
 const resultTestMode = JSON.parse(localStorage.getItem('testModeData'));
 const resultExamMode = JSON.parse(localStorage.getItem('examModeData'));
 
+const mode = localStorage.getItem('mode');
+const savedTimer = localStorage.getItem('timer');
+
+const logo = document.querySelector('.logo');
 const testMode = document.querySelector('#study-mode');
 const numberCurrentWord = document.querySelector('#current-word');
 const wordsProgress = document.querySelector('#words-progress');
@@ -188,19 +192,81 @@ function defineAttribute() {
         next.disabled = true;
     } else if (wordCounter >= 1) {
         back.disabled = false;
+        next.disabled = false;
     };
 
     setTestModeData();
 };
 
+sliderControls.addEventListener('click', (event) => {
+    const button = event.target.id;
+
+    if (button === 'back') {
+        wordCounter--;
+        numberCurrentWord.textContent--;
+        insertWord();
+        defineAttribute();
+        wordsProgress.value -= 20;
+        setTestModeData();
+    };
+
+    if (button === 'exam') {
+        studyMode = 'examination';
+        determineMode();
+        insertCards();
+        startTimer();
+        localStorage.setItem('mode', 'examMode');
+    };
+
+    if (button === 'next') {
+        wordCounter++;
+        numberCurrentWord.textContent++;
+        insertWord();
+        defineAttribute();
+        wordsProgress.value += 20;
+        setTestModeData();
+    };
+});
+
+function switchExamMode() {
+    testMode.classList.add('hidden');
+    boxTestCards.classList.add('hidden');
+    examMode.classList.remove('hidden');
+};
+
 function determineMode() {
     if (studyMode === 'examination') {
-        testMode.classList.add('hidden');
-        boxTestCards.classList.add('hidden');
-        examMode.classList.remove('hidden');
+        switchExamMode();
     } else if (studyMode === 'statistics') {
         resultsModal.classList.remove('hidden');
+    } else if (studyMode === 'testing') {
+        testMode.classList.remove('hidden');
+        boxTestCards.classList.remove('hidden');
+        resultsModal.classList.add('hidden');
     };
+};
+
+if (mode === 'examMode') { 
+    switchExamMode();
+    examTimer.textContent = savedTimer ? savedTimer : '00:00';
+    startTimer();
+};
+
+if (mode === 'statistics') { 
+    resultsModal.classList.remove('hidden');
+    switchExamMode();
+
+    const fragment = new DocumentFragment();
+    resultExamMode.statistics.forEach(({ word, attempts }) => {
+        const wordStats = templateWordStats.content.cloneNode(true);
+        wordStats.querySelector('.word').querySelector('span').textContent = word;
+        wordStats.querySelector('.attempts').querySelector('span').textContent = attempts;
+        fragment.append(wordStats);
+    });
+    boxResultsContent.append(fragment);
+
+    resultExamTime.textContent = savedTimer;
+    examTimer.textContent = savedTimer;
 };
 
 function insertCards() {
@@ -229,35 +295,6 @@ function insertCards() {
     });
 };
 
-sliderControls.addEventListener('click', (event) => {
-    const button = event.target.id;
-
-    if (button === 'back') {
-        wordCounter--;
-        numberCurrentWord.textContent--;
-        insertWord();
-        defineAttribute();
-        wordsProgress.value -= 20;
-        setTestModeData();
-    };
-
-    if (button === 'exam') {
-        studyMode = 'examination';
-        determineMode();
-        insertCards();
-        startTimer();
-    };
-
-    if (button === 'next') {
-        wordCounter++;
-        numberCurrentWord.textContent++;
-        insertWord();
-        defineAttribute();
-        wordsProgress.value += 20;
-        setTestModeData();
-    };
-});
-
 let timerId = 0;
 
 function startTimer() {
@@ -271,7 +308,9 @@ function startTimer() {
             seconds = 0;
         };
 
-        examTimer.textContent = `${format(minutes)}:${format(seconds)}`;
+        const time = `${format(minutes)}:${format(seconds)}`;
+        examTimer.textContent = time;
+        localStorage.setItem('timer', time);
     }, 1000);
 };
 
@@ -294,12 +333,13 @@ let firstCardId = '';
 let secondCard = '';
 let secondCardId = '';
 
-let totalPercent = 0;
+let totalPercent = resultExamMode ? resultExamMode.percent : 0;
+correctPercent.textContent = `${totalPercent}%`;
+examProgress.value = totalPercent;
 
 function testKnowledge(event) {
     clickCounter++;
 
-    const wordStats = templateWordStats.content.cloneNode(true);
     let card = event.target;
     let cardId = event.target.id;
 
@@ -322,10 +362,13 @@ function testKnowledge(event) {
                 totalPercent += 20;
                 correctPercent.textContent = `${totalPercent}%`;
                 examProgress.value += 20;
+                const fragment = new DocumentFragment();
+                const wordStats = templateWordStats.content.cloneNode(true);
                 wordStats.querySelector('.word').querySelector('span').textContent = firstCardId;
                 wordStats.querySelector('.attempts').querySelector('span').textContent = attemptCounter;
                 setExamModeData();
-                boxResultsContent.append(wordStats);
+                fragment.append(wordStats);
+                boxResultsContent.append(fragment);
                 attemptCounter = 0;
             } else {
                 clickCounter = 0;
@@ -352,6 +395,7 @@ function testKnowledge(event) {
         examCards.innerHTML = '';
         studyMode = 'statistics';
         determineMode();
+        localStorage.setItem('mode', 'statistics');
         resultExamTime.textContent = examTimer.textContent;
     };
 };
@@ -371,8 +415,7 @@ function setTestModeData() {
 };
 
 function setExamModeData() {
-    examMode.percent = totalPercent;
-    examModeData.timeTest = examTimer.textContent;
+    examModeData.percent = totalPercent;
     const stats = {};
     stats.word = firstCardId;
     stats.attempts = attemptCounter;
@@ -380,3 +423,9 @@ function setExamModeData() {
     examModeData.statistics = examStatistics;
     localStorage.setItem('examModeData', JSON.stringify(examModeData));
 };
+
+logo.addEventListener('click', () => {
+    localStorage.clear();
+    studyMode = 'testing';
+    determineMode();
+});
